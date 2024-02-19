@@ -364,6 +364,9 @@ class TextToDataConverter
   end
 end
 
+# ここにバージョン情報を追加
+VERSION = '1.0.0'
+
 # コマンドラインオプションの解析と実行のセットアップ
 options = {}
 OptionParser.new do |opts|
@@ -379,6 +382,12 @@ OptionParser.new do |opts|
 
   opts.on("-nx", "YAMLによる外部プログラムの呼び出しを無視する") do
     options[:no_external_script] = true
+  end
+
+  # バージョン情報を表示するオプション
+  opts.on_tail("-v", "--version", "バージョン情報を表示する") do
+    puts "#{VERSION}"
+    exit
   end
 
   opts.on_tail("-h", "--help", "ヘルプを表示する") do
