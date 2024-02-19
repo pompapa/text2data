@@ -1,0 +1,13 @@
+= Text2Data: A Versatile Text Conversion Tool
+
+Text2Data is a powerful command-line tool designed for transforming structured text data into various formats including CSV, Excel, and AsciiDoc. Built with Ruby, it enables extensive customization through YAML configuration files.
+
+== Key Features
+
+* Multiple Formats: Convert text data into CSV, Excel, or AsciiDoc formats.
+* Pattern Matching: Utilize regular expressions for data identification and organization.
+* External Script Support: Incorporate external Ruby scripts for advanced data processing.
+* Customizable Styles: Set styles for Excel outputs like fonts, colors, and alignments.
+* User-Friendly: Offers comprehensive error handling and detailed command-line options.
+
+Ideal for processing log files, generating reports, and converting legacy text data, Text2Data is a flexible and powerful tool for various data manipulation tasks.
