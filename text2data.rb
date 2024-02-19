@@ -74,8 +74,8 @@ class TextToDataConverter
   # @param output_filename [String] 出力ファイルの名前
   # @param pattern_files [Array<String>] パターン設定ファイル（YAML形式）のリスト
   # @param format [String] 出力フォーマット（'csv'、'excel'、または 'adoc'）
-  def initialize(input_filename, output_filename, pattern_files, format,no_external_script)
-    @input_filename = input_filename
+  def initialize(input_files, output_filename, pattern_files, format, no_external_script)
+    @input_files = input_files
     @output_filename = output_filename
     @patterns = merge_patterns(pattern_files)
     @no_external_script = no_external_script
@@ -89,8 +89,13 @@ class TextToDataConverter
   end
 
   # メインの変換プロセスを実行するメソッド。
+  # 各入力ファイルに対して変換処理を行うメソッド
   def convert
-    read_and_process_file
+    @input_files.each do |input_filename|
+      read_and_process_file(input_filename)
+      @current_row = {}  # 現在の行の状態をリセット
+      @previous_line = ''  # 前の行の状態をリセット
+    end
     write_output
   end
 
@@ -121,8 +126,8 @@ class TextToDataConverter
 
   # テキストファイルを読み込み、行ごとに処理するメソッド。
   # @raise [RuntimeError] ファイルの読み込みに失敗した場合
-  def read_and_process_file
-    lines = FileHandler.read_file(@input_filename)
+  def read_and_process_file(input_filename)
+    lines = FileHandler.read_file(input_filename)
     lines.each do |line|
       process_line(line)
     end
@@ -369,6 +374,9 @@ VERSION = '1.0.0'
 
 # コマンドラインオプションの解析と実行のセットアップ
 options = {}
+input_files = []
+pattern_files = []
+
 OptionParser.new do |opts|
   opts.banner = "使用法: ruby script.rb [options] <input_file> <pattern_file1> [pattern_file2 ...]"
 
@@ -384,10 +392,19 @@ OptionParser.new do |opts|
     options[:no_external_script] = true
   end
 
+  opts.on("-i", "--input-list FILE", "ファイルリストを含むファイル") do |file|
+    input_files = File.readlines(file).map(&:strip)
+    puts input_files
+  end
+
   # バージョン情報を表示するオプション
   opts.on_tail("-v", "--version", "バージョン情報を表示する") do
     puts "#{VERSION}"
     exit
+  end
+
+  opts.on("-i", "--input-list FILE", "ファイルリストを含むファイル") do |file|
+    input_files = File.readlines(file).map(&:strip)
   end
 
   opts.on_tail("-h", "--help", "ヘルプを表示する") do
@@ -396,18 +413,30 @@ OptionParser.new do |opts|
   end
 end.parse!
 
-input_filename, *pattern_files = ARGV
+pattern_files = ARGV
 format = options[:format] || 'csv'
 output_filename = options[:output]
 no_external_script = options[:no_external_script]
 
-if input_filename.nil? || pattern_files.empty?
-  puts "エラー: 入力ファイルおよび少なくとも1つのパターンファイルを指定してください。"
+
+
+# 従来通りの引数から入力ファイルを取得する場合
+if input_files.empty?
+  input_files = [ARGV.shift] # 入力ファイル名を先頭から取得
+end
+
+pattern_files = ARGV
+format = options[:format] || 'csv'
+output_filename = options[:output]
+no_external_script = options[:no_external_script]
+
+if input_files.empty? || pattern_files.empty?
+  puts "エラー: 入力ファイルとパターンファイルを指定してください。"
   exit
 end
 
 begin
-  converter = TextToDataConverter.new(input_filename, output_filename, pattern_files, format,no_external_script)
+  converter = TextToDataConverter.new(input_files, output_filename, pattern_files, format, no_external_script)
   converter.convert
 rescue StandardError => e
   puts "エラーが発生しました: #{e.message}"
