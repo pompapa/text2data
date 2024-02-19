@@ -30,19 +30,21 @@ class FileHandler
   # @param data [Array<Array<String>>] CSVに書き込むデータ
   # @raise [RuntimeError] ファイルの書き込みに失敗した場合
   
-    def self.write_csv(filename, data)
-      CSV.open(filename, "w", force_quotes: true) do |csv|
-        data.each { |row| csv << row }
-      end
-    rescue IOError => e
-      raise "CSVファイルの書き込み中にエラーが発生しました（#{filename}）: #{e.message}"
+  def self.write_csv(filename, data, append)
+    mode = append ? "a" : "w"
+    CSV.open(filename, mode, force_quotes: true) do |csv|
+      data.each { |row| csv << row }
     end
+  rescue IOError => e
+    raise "CSVファイルの書き込み中にエラーが発生しました（#{filename}）: #{e.message}"
+  end
+  
   # ワークブックオブジェクトをExcelファイルとして書き込みます。
   # @param filename [String] 出力先のExcelファイル名
   # @param workbook [RubyXL::Workbook] 書き込むExcelのワークブックオブジェクト
   # @raise [RuntimeError] ファイルの書き込みに失敗した場合
   
-    def self.write_excel(filename, workbook)
+    def self.write_excel(filename, workbook,append)
       workbook.write(filename)
     rescue IOError => e
       raise "Excelファイルの書き込み中にエラーが発生しました（#{filename}）: #{e.message}"
@@ -74,7 +76,7 @@ class TextToDataConverter
   # @param output_filename [String] 出力ファイルの名前
   # @param pattern_files [Array<String>] パターン設定ファイル（YAML形式）のリスト
   # @param format [String] 出力フォーマット（'csv'、'excel'、または 'adoc'）
-  def initialize(input_filename, output_filename, pattern_files, format, no_external_script)
+  def initialize(input_filename, output_filename, pattern_files, format, no_external_script, options)
     @input_filename = input_filename
     @output_filename = output_filename
     @patterns = merge_patterns(pattern_files)
@@ -86,6 +88,7 @@ class TextToDataConverter
     @format = format
     @header_style = format_header_style
     @cell_styles = format_cell_styles
+    @options = options
   end
 
   # メインの変換プロセスを実行するメソッド。
@@ -217,7 +220,7 @@ class TextToDataConverter
   def write_csv
     prepared_data = prepare_data_for_output
     if @output_filename
-      FileHandler.write_csv(@output_filename, prepared_data)
+      FileHandler.write_csv(@output_filename, prepared_data, @options[:append])
     else
       prepared_data.each { |row| puts CSV.generate_line(row) }
     end
@@ -241,10 +244,19 @@ class TextToDataConverter
     if @output_filename.nil?
       raise "Excelフォーマットでは出力ファイル名が必要です。"
     end
-    workbook = RubyXL::Workbook.new
-    worksheet = workbook[0]
+    sheet_name = @options[:sheet_name] || @input_filename
+    if File.exist?(@output_filename) && @options[:append]
+      workbook = RubyXL::Parser.parse(@output_filename)
+      worksheet = workbook.add_worksheet(sheet_name)
+    else
+      workbook = RubyXL::Workbook.new
+      worksheet = workbook[0]
+      worksheet.sheet_name = sheet_name
+    end
+  
     set_column_widths(worksheet)
     write_header_row(worksheet)
+  
     prepared_data = prepare_data_for_output
     prepared_data.each_with_index do |row, row_index|
       row.each_with_index do |cell_data, column_index|
@@ -252,6 +264,7 @@ class TextToDataConverter
         apply_cell_style(cell, @cell_styles[column_index])
       end
     end
+  
     workbook.write(@output_filename)
   end
 
@@ -394,6 +407,15 @@ OptionParser.new do |opts|
     exit
   end
 
+  opts.on("-a", "--append", "既存のファイルにデータを追加する") do
+    options[:append] = true
+  end
+  
+  opts.on("-s", "--sheet-name SHEET_NAME", "Excelシート名を指定する") do |sheet_name|
+    options[:sheet_name] = sheet_name
+    puts "Sheet name: #{sheet_name}"
+  end
+
   opts.on_tail("-h", "--help", "ヘルプを表示する") do
     puts opts
     exit
@@ -411,7 +433,7 @@ if input_filename.nil? || pattern_files.empty?
 end
 
 begin
-  converter = TextToDataConverter.new(input_filename, output_filename, pattern_files, format, no_external_script)
+  converter = TextToDataConverter.new(input_filename, output_filename, pattern_files, format, no_external_script,options)
   converter.convert
 rescue StandardError => e
   puts "エラーが発生しました: #{e.message}"
