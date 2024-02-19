@@ -324,9 +324,11 @@ class TextToDataConverter
         fg_color: column['font_color'] || @patterns['defaults']['font_color'],
         bg_color: column['bg_color'] || @patterns['defaults']['bg_color'],
         bold: column['bold'] || false,
-        horizontal_align: (column['alignment'] || 'left').to_sym,
+        horizontal_align: (column['halignment'] || @patterns['defaults']['halignment']).to_sym,
+        vertical_align: (column['valignment'] || @patterns['defaults']['valignment']).to_sym,
         text_wrap: column['text_wrap'] || @patterns['defaults']['text_wrap']
       }
+#      puts vertical_alignment: (column['valignment'] || @patterns['defaults']['valignment']).to_sym
     end
   end
 
@@ -349,6 +351,11 @@ class TextToDataConverter
     cell.change_fill(style[:bg_color])
     cell.change_font_bold(style[:bold])
     cell.change_horizontal_alignment(style[:horizontal_align])
+    cell.change_vertical_alignment(style[:vertical_align])
+    cell.change_border(:top, 'thin')
+    cell.change_border(:bottom, 'thin')
+    cell.change_border(:left, 'thin')
+    cell.change_border(:right, 'thin')
     cell.change_text_wrap(style[:text_wrap])
   end
 
@@ -369,10 +376,31 @@ class TextToDataConverter
   # @param col_data [Hash] 変換する列データ
   # @return [String] 変換されたデータ
   def transform_column_data(col_data)
+      col_data[:data].tap do |data|
+        @patterns['columns'].each do |column|
+          if column['transform'] && col_data[:id] == column['id']
+            regex = Regexp.new(column['transform']['regex'])
+            replacement = column['transform']['replacement']
+            data.gsub!(regex, replacement)
+          end
+        end
+      end
     if col_data[:xscript] && !@no_external_script
       ExternalScriptRunner.run_script(col_data[:data], col_data[:xscript])
     else
       col_data[:data]
+    end
+  end
+end
+
+def transform_column_databyRegex(col_data)
+  col_data[:data].tap do |data|
+    @patterns['columns'].each do |column|
+      if column['transform'] && col_data[:id] == column['id']
+        regex = Regexp.new(column['transform']['regex'])
+        replacement = column['transform']['replacement']
+        data.gsub!(regex, replacement)
+      end
     end
   end
 end
